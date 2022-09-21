@@ -1,0 +1,236 @@
+---
+title: "Modeling information effects using R"
+author: "Kristoffer Ahlstrom-Vij"
+date: '2022-09-21'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+df <- read_csv("/Users/ahlstromvij/Dropbox/Personal/Coding/R/inf_effect/epcc_data_processed.csv")
+df <- df %>% 
+  mutate(cc_increase_taxes_binary = case_when(cc_increase_taxes > 3 ~ 1, TRUE ~ 0),
+         cc_moral_concern_binary = case_when(cc_moral_concern > 3 ~ 1, TRUE ~ 0),
+         income = factor(income, levels = c("up_to_9499",
+                                            "9500_17499",
+                                            "17500_24999",
+                                            "25000plus"),
+                         ordered=T),
+         education = factor(education, levels = c("no_qual",
+                                                  "other",
+                                                  "gcse",
+                                                  "alevel",
+                                                  "student",
+                                                  "degree"),
+                            ordered=T)) %>% 
+  select(age, gender, education, income, 
+         cc_climate_changing,
+         cc_causes,
+         cc_scientists_agree,
+         cc_increase_taxes_binary, 
+         cc_moral_concern_binary,
+         survey_wt)
+```
+
+## Why information matter in politics
+
+In politics like elsewhere, what we know matters for what we want. Lucy wants harsh sentencing because she believes it will reduce crime rates. Were she to find out that it does not, she wouldn’t want harsh sentencing anymore. Bob wants less immigration because he believes that it hurts the economy. Were he to learn that immigration tends to have a positive, economic impact he would no longer want to see it reduced.
+
+That's why political scientists, rightly, are concerned with studying what voters know, and what difference it would make had they known  more. The former question has been extensively investigated in the literature on public ignorance -- because at it turns out, most of us know very little when it comes to politically relevant matters. The latter (what difference knowledge makes in politics) has been studied in the literature under the heading of 'information effects' (Althaus 2003; Bartels 1996).
+
+The information effects literature makes clear that knowledge does matter for politics and can in some cases even change the electoral outcome. For example, Blais and colleagues (2008) simulate the outcome of six past Canadian elections, involving three to four parties, with fully informed voters, and see a likely difference in outcome in one. Oscarsson (2007) simulates six past Swedish elections, involving eight main parties, and sees a likely difference in outcome in two of them. 
+
+Even where information effects don't change outcomes, they can still have substantial implications for party political choice. Bhatti (2010) models three European Parliament elections – in Denmark, Finland, and Sweden – and finds several cases in which the differences between actual and simulated support are in the double digits. Similarly, Hansen (2009) models two Danish elections and finds a substantial change in the power distribution internal to the party blocks. For example, in one case, doubling the degree to which the voters were informed would have almost doubled the level of support for the Conservatives.
+
+## Information effects and counterfactual modeling
+
+Whether explicitly framed in those terms, modeling of information effects involve a form of counterfactual or causal modeling (Morgan and Winship 2015): a model is fitted, not for purposes of making a straightforward prediction (as in predictive modeling), e.g., concerning how some particular respondent might respond, but in order to estimate how a respondent would have responded, had they been more informed, with reference to some relevant measure of knowledge (Delli Carpini and Keeter 1996). Such an estimation is performed by fitting the model on the relevant data, and then using the model to make a "prediction," once the value on the knowledge variable for each respondent has been set to whatever value designates being "informed," thereby estimating what each respondent would have responded, had they been fully informed.
+
+How does one do this in practice? That's the answer this tutorial is looking to answer. It will walk through the following steps, each including general R functions that can be re-used by others interested in information effects modeling on their own particular data sets:
+
+- Fitting an Item Response Theory model to construct a knowledge scale from a set of knowledge items
+- Evaluating the construct validity of that scale
+- Calculating propensity scores for counterfactual modeling and evaluating these using balance plots
+- Calculate information effects employing such propensity scores
+
+Throughout, each step and function will be illustrated by way of data set containing attitudinal variables about climate change, alongside demographic variables and a small set of three knowledge variables, in order to estimate what difference information would make to support for increased taxation on carbon based fuels, and the level of moral concern felt about poorer countries and future generations in the face of climate change. 
+
+## Modeling information effects using R
+
+### Constructing a knowledge scale using IRT
+
+The first thing we need in order to model information effects is, naturally enough, some measure of participant's level of knowledge. This will typically take the form of a number of TRUE / FALSE items, where "Don't know" responses are generally coded as FALSE, i.e., as respondents not knowing the relevant answer (Zaller 1992: 339; Althaus 2003: 105). 
+
+One straightforward way to create such a scale is to simply add up all correct answers. One downside with doing so is that, outside of getting no questions right and getting all questions wrong, there are more than one ways to get a particular number of responses correct. Since some questions are more difficult than others, and getting those right thereby is more diagnostic of being informed, a purely additive scale thereby risks grouping together people of different abilities.
+
+A better way to construct the relevant scale is therefore to use Item Response Theory (IRT) model, which is able to discriminate between the ability of respondents with different response patterns. As we shall see, an IRT model will also serve to give a window into the performance of individual items, thereby helping the researchers construct a good knowledge scale.
+
+The function below generates an IRT scale on the basis of a set of knowledge items, a data frame wherein to put that scale, and a percentile cut-off for a corresponding binary knowledge scale (more on the reason for this in a moment):
+
+```{r irt_function, message=FALSE, results='hide'}
+library(mirt)
+library(psych)
+library(ggpubr)
+irt_scale <- function(items, data, binary_cutoff = 0.9) {
+  # save all knowledge items to a data frame
+  items_df <- data.frame(matrix(NA, nrow = dim(data)[1], ncol = length(items)))
+  for (i in 1:length(items)) {
+    items_df[,i] <- data[[items[i]]]
+  }
+  
+  # fit irt model
+  irt_mod <- mirt(data=items_df,
+                  model=1,
+                  itemtype = "2PL",
+                  verbose=FALSE)
+  
+  # save knowledge scores
+  know_scores <- fscores(irt_mod)[,1]
+  
+  # create binary knowledge variable
+  knowledge_threshold <- quantile(know_scores, binary_cutoff)
+  know_scores_binary <- ifelse(know_scores >= knowledge_threshold, 1, 0)
+  know_scores_binary_tbl <- prop.table(table("Proportion of observations in each category:" = know_scores_binary))
+  
+  # save empirical plots to list
+  plot_list_empirical <- vector('list', length(items))
+  for (i in 1:length(items)) {
+    plot_list_empirical[[i]] <- local({
+      i <- i
+      print(itemfit(irt_mod, empirical.plot = i))
+    })
+  }
+  empirical_plots <- ggarrange(plotlist = plot_list_empirical)
+  
+  # scree plot
+  psych::fa.parallel(items_df, cor="poly")
+  
+  return(list("know_scores" = know_scores,
+              "know_scores_binary" = know_scores_binary,
+              "know_scores_binary_tbl" = know_scores_binary_tbl,
+              "empirical_plots" = empirical_plots,
+              "trace_plot" = plot(irt_mod, type="trace"),
+              "info_plot" = plot(irt_mod, type="info"),
+              "scree_plot" = recordPlot(),
+              "coef" = coef(irt_mod, IRTpars=T),
+              "model_summary" = summary(irt_mod),
+              "q3" = data.frame(residuals(irt_mod, type="Q3"))))
+}
+```
+
+In addition to generating a knowledge scale, the function also returns a number of elements to use in evaluating the model. 
+
+1. An IRT scale (of this kind) needs to be unidimensional, i.e., the items involved should tap into a single trait. This can be evaluated by way consulting the `scree_plot` that's return. 
+2. An IRT scale should also exhibit local independence, i.e., that, conditional on the latent variable(s), item responses are unrelated to one another. This is evaluated using Yen's `Q3`. Yen (1993) suggested a cut-off value of 0.2, but as pointed out by de Ayala (2009: 133), a Q3 test tends to give inflated negative values for short tests.
+3. Model fit can be evaluated visally by looking at the `empirical_plots` returned by the function.
+
+Let's start by fitting a model on our three knowledge items:
+
+```{r irt_model, echo=TRUE, fig.show='hide', message=FALSE, results='hide'}
+irt_model <- irt_scale(c("cc_climate_changing",
+                         "cc_causes",
+                         "cc_scientists_agree"),
+                       df)
+```
+
+Then let's look at the scree plot, the Q3 values, and the empirical plots:
+
+```{r irt_diagnostics_1}
+irt_model$scree_plot
+```
+
+As seen by the steep drop before 2 factors in the scree plot for both the actual and the resampled data, there is good reason to believe that the unidimensionality assumption is satisfied. 
+
+```{r irt_diagnostics_2}
+irt_model$q3
+```
+
+The largest Q3 value is 0.43, which would seem acceptable, given the short scale. 
+
+```{r irt_diagnostics_3}
+irt_model$empirical_plots
+```
+
+The empirical plots for item 1 and 2 suggest good fit, and less so for item 3.
+
+Let's now look more closely at the IRT model itself:
+
+```{r irt_model_details_1}
+irt_model$model_summary
+```
+
+The F1 values in the `model_summary` gives us the loadings of the items onto the factor. All three items load well onto the factor. 
+
+```{r irt_model_details_2}
+irt_model$coef
+```
+
+In regards to the coefficients (`coef`), we ideally want to see discrimination values (`a`) greater than 1, which would indicate that the relevant item discriminates well between people of different levels of knowledge. This discrimination value is also reflected in the item probability function (`trace_plot`) below, with steeper curves representing greater discrimination. 
+
+The `b` value in the coefficient output designates the point on the ability spectrum on which a respondent becomes more than 50% likely to answer that question correctly. The same value can be plotted on the trace plot by drawing a straight line from 0.5 on the y-axis out to the line, and then a vertical line down to theta value on the x-axis, representing the level of ability.
+
+```{r irt_model_details_3}
+irt_model$trace_plot
+```
+
+The test information plot (`info_plot`) shows at what point on the ability spectrum the test offers most information, which we in this case can see is below 0, and as such below mean ability:
+
+```{r irt_model_details_4}
+irt_model$info_plot
+```
+
+As mentioned above, the function also generates a binary knowledge variable, by default constructed by assigning a 1 ("informed") to everyone in the 90th percentile and above on the continuous knowledge scale, and 0 ("not informed") otherwise. This the binary variable that will be used later on when calculating so-called propensity scores, for purposes of balanace the data set and break any correlation between the knowledge variable and, e.g., demographic variables (like education and income). 
+
+For such balancing to work, we ideally want to set the bar for being "informed" at a level that's demanding enough to be conceptually plausible, yet not so demanding that very few people quality. This can be evaluated by consulting the proportion of observations that end up in each of the two categories:
+
+```{r irt_table}
+irt_model$know_scores_binary_tbl
+```
+
+As we can see, about a quarter end up in the "informed" category, which seems a reasonable proportion in this context.
+
+Finally, let us save our knowledge scores to our data frame:
+
+```{r irt_scores}
+df$knowledge <- irt_model$know_scores
+df$knowledge_binary <- irt_model$know_scores_binary
+```
+
+### Construct validity
+
+By performing the above type of diagnostics on our knowledge scale, we can get a good sense of whether the model performs well from a formal perspective, e.g., in regards to unidimensionality and local independence. However, we also would like to be able to validate that the score plausibly is measuring some form of knowledge specifically.
+
+One way of doing this is to investigate the relationship between our knowledge scale and demographic factors that we know are associated with knowledge, such as education and income. Roughly, we would want to see that, as level of education and income increases, then so does the value on our scale.
+
+One way to do this is to look at the estimated marginal means for each level of education and income, as follows:
+
+```{r emmeans}
+library(emmeans)
+inf_emmeans <- function(knowledge_var, covariates, data) {
+  # construct formula
+  f <- as.formula(
+    paste(knowledge_var,
+          paste(covariates, collapse = " + "),
+          sep = " ~ "))
+  
+  # fit model
+  m <- lm(f, 
+          data = data)
+  
+  # create list of emmeans by each covariate
+  emmeans_list <- list()
+  for (i in 1:length(covariates)) {
+    emmeans_list[[i]] <- emmeans(m, specs = covariates[i])
+  }
+  
+  return(emmeans_list)
+}
+
+inf_emmeans("knowledge",
+            c("income", "education"), 
+            df)
+```
+
+We can see that knowledge scale increases monotonically with both income and education, which is what we should expect if our scale taps into knowledge. This offers some evidence of construct validity.
