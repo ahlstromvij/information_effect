@@ -228,9 +228,9 @@ df$knowledge_binary <- irt_model$know_scores_binary
 
 By performing the type of diagnostics covered in the previous section on our knowledge scale, we can get a good sense of whether the model performs well from a formal perspective, i.e., in regards to unidimensionality, local independence, and model fit. However, we also would like to be able to validate that the score plausibly is measuring some form of knowledge specifically.
 
-One way of doing this is to investigate the relationship between our knowledge scale and demographic factors that we know to be associated with knowledge, such as education and income. Roughly, we would want to see that, as level of education and income increases, so does the value on our scale.
+One way of doing this is to investigate the relationship between our knowledge scale and demographic factors that we know to be associated with knowledge. Specifically, we expect that men should score more highly on our scale than women [@vanheerdehudson2020; @plutzer2020], and that the same should go for people who are older [@plutzer2020], who have higher levels of education [@hebbelstrup2016], and who earn more [@vowles2020; @plutzer2020].
 
-One way to do this is to look at the estimated marginal means for each level of education and income, as follows:
+One way to investigate this is to look at the estimated marginal means for each level of education, income, gender, and age as follows:
 
 ```{r emmeans}
 # order factor levels
@@ -273,21 +273,21 @@ inf_emmeans <- function(knowledge_var, covariates, data) {
 }
 
 inf_emmeans("knowledge",
-            c("income", "education"), 
+            c("income", "education","gender","age"), 
             df)
 ```
 
-We can see that knowledge scale increases in an almost monotonic fashion for education, which is what we should expect if our scale measures knowledge. This offers some evidence of construct validity. The marginal means for income are less clear cut, although the lowest household income quintile has the lowest mean level of knowledge, while the highest has the highest mean.
+We can see that the scale value increases in an (almost exclusively) monotonic fashion for education, income, and age, which is what we should expect if our scale measures knowledge. We also see that the mean level of knowledge is greater for men than for women. This all offers some evidence of construct validity. 
 
 ## Calculating propensity scores
 
-As noted earlier, information modeling is a type of counterfactual modeling, estimating the causal effect that we would have seen, had we been able to intervene on the knowledge variable. Best practice in counterfactual modeling is to rely on so-called doubly-robust estimation, which  looks to approximate the situation we would have found ourselves in, had our data been the result of a randomized experimental design with a single treatment [@morganwinship2015]. The ‘double robustness’ owes to how effects are estimated in a context where we have both controlled for assumed confounds (as in standard regression), and taken steps to make up for the fact that the data have not come about as a result of randomized assignment. In the present case, this second layer of ‘robustness’ is achieved by using so-called ‘propensity scores’ as weights in the subsequent models.
+As noted earlier, information modeling is a type of counterfactual modeling, estimating the causal effect that we would have seen, had we been able to intervene on (i.e., increase) the knowledge variable. Best practice in counterfactual modeling is to rely on so-called doubly-robust estimation, which looks to approximate the situation we would have found ourselves in, had our data been the result of a randomized experimental design with a single treatment [@morganwinship2015]. The ‘double robustness’ owes to how effects are estimated in a context where we have both controlled for assumed confounds (as in standard regression), and taken steps to make up for the fact that the data have not come about as a result of randomized assignment. In the present case, this second layer of ‘robustness’ is achieved by using so-called ‘propensity scores’ as weights in the subsequent models.
 
 This is where the binary knowledge variable from before comes in. In our case, propensity scores measure the probability (i.e. propensity) that an observation will be found in the ‘fully informed’, binary category, as a function of someone’s demographic features. The idea is to then use these scores to remove any correlation between these features and the ‘informed’ category, to justify a counterfactual inference. 
 
-To see why, return to the paradigm of a randomized experimental design, where the random allocation of participants to a treatment and a control group means that no feature of the participant is predictive of being found in the treatment as opposed to in the control. Whether female or male, rich or poor (and so on), you are equally likely to end up in one group as opposed to in the other, provided assignment is truly random. In the case of observational data, by contrast, this might not be the case. It might (for example) be that some features of the observations – such as, their level of education – are predictive of ending up in the ‘informed’ category.
+To see why, return to the paradigm of a randomized experimental design, where the random allocation of participants to a treatment and a control group means that no feature of the participant is predictive of being found in the treatment as opposed to in the control. Whether female or male, rich or poor (and so on), you are equally likely to end up in one group as opposed to in the other. In the case of observational data, by contrast, this might not be the case. It might (for example) be that some features of the observations – such as, their level of education – are predictive of ending up in the ‘informed’ category.
 
-In fact, let's look at the data at hand, to see determine whether the demographic factors that we have reason to believe influence someone's degree of knowledge -- i.e.,  gender [@vanheerdehudson2020; @plutzer2020], level of education [@hebbelstrup2016], income [@vowles2020; @plutzer2020], and age [@plutzer2020] -- are predictive of knowledge:
+In fact, let's look at the data at hand, to determine whether the demographic factors that we have reason to believe influence someone's degree of knowledge -- again, gender, level of education, income, and age [@plutzer2020] -- are predictive of knowledge:
 
 ```{r predictive}
 df <- df %>% 
@@ -342,7 +342,7 @@ What we want to see in this distribution is a clustering of propensity scores to
 
 ## Evaluating propensity scores using balance plots
 
-Since the whole point of propensity scores is to balance the sample, we want to inspect using balance plots whether we have been successful on that score.
+Since the whole point of propensity scores is to balance the sample, we want to inspect whether we have been successful on that score using balance plots, here generated using the R package `cobalt` [@greifer2022].
 
 ```{r balance_plots, message=FALSE}
 library(cobalt)
@@ -365,23 +365,23 @@ bal_plots <- balance_plots("knowledge_binary",
                            df)
 ```
 
-We see there that, in each case, balance has been improved by the propensity scores (the right pane in each of the graphs). Had that not been the case, we might have wanted to revisit our, e.g., the cut-off for being 'informed' (currently, 90th percentile or above), in case the balance between the two groups is so lopsided that it's difficult to balance them using propensity scores.
+We see there that, in each case, balance has been improved by the propensity scores (the right pane in each of the graphs). Had that not been the case, we might have wanted to revisit the cut-off for being 'informed' (currently, 90th percentile or above), in case the balance between the two groups is so lopsided that it's difficult to balance them using propensity scores.
 
 ## Drawing up a DAG
 
-We now need to specify our model -- or models, in case we want to use several specifications. Since care needs to be taken when specifying and interpreting causal models, the first thing to do is to justify one's choices regarding what variables are to be included and excluded.  By transparently presenting the rationale for our model specifications, and visualizing this as a directed acyclic graph (DAG), we adhere to good practice for political scientists who use observational data to address causal questions [@keeleetal2020].
+We now need to specify our model -- or models, in case we want to use several specifications. Since care needs to be taken when specifying and interpreting causal models, the first thing to do is to justify one's choices regarding what variables are to be included and excluded. By transparently presenting the rationale for model specifications, and visualizing this as a directed acyclic graph (DAG), we adhere to good practice for political scientists who use observational data to address causal questions [@keeleetal2020].
 
 As in traditional regression, we need to control for any confounders. In our case, those are variables that have a causal effect on both someone’s degree of political knowledge and their political attitudes or preferences. Existing evidence suggests gender [@vanheerdehudson2020; @plutzer2020], level of education [@hebbelstrup2016], income [@vowles2020; @plutzer2020], and possibly age [@plutzer2020] fall in this category. Moreover, to reduce noise in these models, we also do well to control for variables that can be expected to change someone’s political preferences, whether also their degree of knowledge, such as ethnicity (e.g., through a “shared faith”; @dawson1995) and religion [@evans2020]. 
 
 What about partisanship, as measured by party identification? Despite being a prominent variable in political scientific modeling, we probably do well to exclude it in this context for two reasons:
 
-First, it is likely affected by political knowledge, specifically, knowledge of parties’ and candidates’ positions [@brader2018; @fowler2014]. This would make it a mediator in the language of counterfactual/causal modeling. Controlling for a mediator, or a causal node located on a direct or indirect pathway between (in this case) political knowledge and political preference, will mean misestimating the relevant causal effect. 
+First, it is likely affected by political knowledge, specifically, knowledge of parties’ and candidates’ positions [@brader2018; @fowler2014]. This would make it a mediator in the language of counterfactual/causal modeling. Controlling for a mediator, or a causal node located on a direct or indirect pathway between (in this case) political knowledge and political preference, will mean misestimating the relevant causal effect [@rohrer2018]. 
 
 Second, even if partisanship is not a mediator, controlling for it in this context is likely unnecessary. Partisanship is heavily influenced by socialization early in life [@campbell1980], including around group-identities of religion, ethnicity, gender, and the like -- all of which shape individuals’ conceptions of what positions “people like us” take in politics [@green2004] Consequently, controlling for such group-level variables (here: gender, ethnicity, and religion) would already account for partisanship.
 
 In the UK context, EU referendum vote is likely to in this respect be similar to partisanship, as far as causal modeling is concerned: research suggests that UK voters’ identification with “Leave” or “Remain” camps have become political identities in their own rights [@hobolt2021]. If correct, then referendum vote choice, too, is an unnecessary control because it is a function of socialization variables for which our model already controls.
 
-The DAG below summarizes the assumptions made here for the purpose of modeling. Note the status of partisanship (“Party” in the graph) as a mediator for knowledge (“Know.”). If partisanship is an unnecessary control, the edge between knowledge and partisanship should be removed. Depending on the position one takes in relation to whether the EU referendum has become a political identity in its own right, EU referendum vote would either replace the partisanship node or (perhaps more plausibly) inhabit a structurally identical node (i.e., a mediator for knowledge) alongside it.
+The DAG below summarises the assumptions made here for the purpose of modeling. Note the status of partisanship (“Party” in the graph) as a mediator for knowledge (“Know.”). If partisanship is an unnecessary control, the edge between knowledge and partisanship should be removed. Depending on the position one takes in relation to whether the EU referendum has become a political identity in its own right, EU referendum vote would either replace the partisanship node or (perhaps more plausibly) inhabit a structurally identical node (i.e., a mediator for knowledge) alongside it.
 
 ```{r dag, message=FALSE, results='hide', warning=FALSE}
 library(ggdag)
@@ -513,7 +513,7 @@ inf3 <- inf_effect(outcome = "immig_self",
                   boot_ci = T)
 ```
 
-Each model looks at actual and informed support for the idea that levels of immigration coming into the UK should be reduced, in order to estimate what difference level of knowledge makes on this issue. Here, we also plot the results, weighted using the survey weights included in the sample in order to approximate representativeness, with the dashed line representing 50% support.
+Each model estimates actual and informed support for the idea that levels of immigration coming into the UK should be reduced, in order to estimate what difference level of knowledge makes on this issue. For both actual and informed support, we apply the survey weights included in the data set to approximate representativeness. We also plot the results with the dashed line representing 50% support.
 
 ```{r inf_effect_1}
 inf1
@@ -539,7 +539,12 @@ ggplot(plot_df) +
   geom_hline(yintercept=0.5, linetype="dashed") +
   ylab("Proportion of support") +
   xlab("Scenario") +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  annotate("text", x = 1, y = plot_df$support[1]+0.025, label = paste(round(plot_df$support[1] * 100, 1),"%", sep="")) +
+  annotate("text", x = 2, y = plot_df$support[4]+0.025, label = paste(round(plot_df$support[4] * 100, 1),"%", sep="")) +
+  annotate("text", x = 3, y = plot_df$support[3]+0.025, label = paste(round(plot_df$support[3] * 100, 1),"%", sep="")) +
+  annotate("text", x = 4, y = plot_df$support[2]+0.025, label = paste(round(plot_df$support[2] * 100, 1),"%", sep=""))
+
 ```
 
 The function returns the formula, the model, as well as the actual and estimated informed proportions (in each case weighted using the survey weights), as well as the difference between the two, i.e., the information effect. We see that, if people in the UK were all to become informed, in the respect operationalised here, the idea that immigration levels should be reduced would likely go from a majority to a minority position (with the dashed line signifying 50%), irrespective of the particular modeling assumptions made, suggesting some robustness of the results. The size of the effect -- close to 10 percentage points for the demographic model -- is noteworthy, especially in the context of the low bar set by the knowledge scale, suggesting that even a low level of knowledge makes a difference.
