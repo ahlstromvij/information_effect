@@ -69,9 +69,9 @@ Information effects modeling can also be used to look at the influence of knowle
 
 # Information effects and counterfactual modeling
 
-Whether explicitly framed in those terms, modeling of information effects involves a form of counterfactual or causal modeling [@morganwinship2015]: a model is fitted, not for purposes of making a straightforward prediction (as in predictive modeling), e.g., concerning how some particular respondent might respond, but in order to estimate how a respondent would have responded, had they been more informed, with reference to some relevant measure of knowledge [@carpinikeeter1996]. Such an estimation is performed by fitting the model on the relevant data, and then using the model to make a "prediction," once the value on the knowledge variable for each respondent has been set to whatever value designates being "informed," thereby estimating what each respondent would have responded, had they been fully informed.
+Whether explicitly framed in those terms, modeling of information effects involves a form of counterfactual or causal modeling [@morganwinship2015]: a model is fitted, not for purposes of making a straightforward prediction (as in predictive modeling), e.g., concerning how some particular respondent might respond, but in order to estimate how a respondent would have responded, had they been more informed, with reference to some relevant measure of political knowledge [@carpinikeeter1996]. Such an estimation is performed by fitting the model on the relevant data, and then using the model to make a "prediction," once the value on the political knowledge variable for each respondent has been set to whatever value designates being "informed," thereby estimating what each respondent would have responded, had they been fully informed.
 
-How does this work in practice? That's the question this guide is looking to answer. It will walk through each step in a complete pipeline from constructing a knowledge scale from a set of knowledge items to modeling the relevant effects, using functions written in  the R programming language [@r_core_team] -- a free, open source language for statistical computing -- that can be re-used by others interested in information effects modeling on their own particular data sets.
+How does this work in practice? That's the question this guide is looking to answer. It will walk through each step in a complete pipeline from constructing a political knowledge scale from a set of items to modeling the relevant effects, using functions written in  the R programming language [@r_core_team] -- a free, open source language for statistical computing -- that can be re-used by others interested in information effects modeling on their own particular data sets.
 
 The functions and their outputs will be illustrated by way of British Election Study data [@bes-17] containing the following attitudinal variable (`immigSelf`): "On a scale from 0-10, how would you prefer immigration levels to Britain changed?" (0 = reduced a lot, 5 = kept the same, 10 = increased a lot). For purposes of modeling, this variable has been re-coded as a binary one, with 1 for responses below 5, and 0 otherwise. This variable will be our outcome variable in what follows, alongside a set of demographic and socioeconomic covariates (education, income, gender, age, religion, ethnicity, partisanship, and EU referendum vote) and four knowledge variables, used in order to estimate what difference information would make to anti-immigration sentiments.
 
@@ -79,7 +79,7 @@ The functions and their outputs will be illustrated by way of British Election S
 
 ## Constructing a knowledge scale using IRT
 
-The first thing we need in order to model information effects is, naturally enough, some measure of participant's level of knowledge. Following the work of Micahel Delli Carpini and Scott Keeter [@carpinikeeter1993; @carpinikeeter1996], this typically takes the form of a number of TRUE / FALSE items, where "Don't know" responses are generally coded as FALSE, i.e., as respondents not knowing the relevant answer [@zaller1992: 339; @althaus2003: 105]. 
+The first thing we need in order to model information effects is, naturally enough, some measure of participant's level of political knowledge. Following the work of Micahel Delli Carpini and Scott Keeter [@carpinikeeter1993; @carpinikeeter1996], this typically takes the form of a number of TRUE / FALSE items, where "Don't know" responses are generally coded as FALSE, i.e., as respondents not knowing the relevant answer [@zaller1992: 339; @althaus2003: 105]. 
 
 One straightforward way to create such a scale is to simply add up all correct answers, for a total knowledge score [@althaus2003]. One downside with doing so is that, outside of getting no questions right and getting all questions wrong, there are more than one ways to get a particular number of responses correct. Since some questions are more difficult than others, and getting those right thereby is more diagnostic of being informed, a purely additive scale thereby risks grouping together people of different abilities.
 
@@ -146,7 +146,7 @@ In addition to generating a knowledge scale, the function also returns a number 
 2. An IRT scale should also exhibit local independence, meaning that, conditional on the latent variable, item responses should be unrelated to one another. This is evaluated using Yen's `Q3` [@yen1993], also returned by the function.
 3. Model fit can be evaluated visually by inspecting the `empirical_plots` returned by the function.
 
-Let's start by fitting a model on our four knowledge items from the BES data set, which are as follows:
+Let's start by fitting a model on our four political knowledge items from the BES data set, which are as follows:
 
 - "Polling stations close at 10.00pm on election day" (True)
 - "No-one may stand for parliament unless they pay a deposit" (True)
@@ -226,9 +226,9 @@ df$knowledge_binary <- irt_model$know_scores_binary
 
 ## Evaluating construct validity
 
-By performing the type of diagnostics covered in the previous section on our knowledge scale, we can get a good sense of whether the model performs well from a formal perspective, i.e., in regards to unidimensionality, local independence, and model fit. However, we also would like to be able to validate that the score plausibly is measuring some form of knowledge specifically.
+By performing the type of diagnostics covered in the previous section on our knowledge scale, we can get a good sense of whether the model performs well from a formal perspective, i.e., in regards to unidimensionality, local independence, and model fit. However, we also would like to be able to validate that the score plausibly is measuring a form of political knowledge specifically.
 
-One way of doing this is to investigate the relationship between our knowledge scale and demographic factors that we know to be associated with knowledge. Specifically, we expect that men should score more highly on our scale than women [@vanheerdehudson2020; @plutzer2020], and that the same should go for people who are older [@plutzer2020], who have higher levels of education [@hebbelstrup2016], and who earn more [@vowles2020; @plutzer2020].
+One way of doing this is to investigate the relationship between our knowledge scale and demographic factors that we know to be associated with political knowledge. Specifically, we expect that men should score more highly on our scale than women [@vanheerdehudson2020; @plutzer2020], and that the same should go for people who are older [@plutzer2020], who have higher levels of education [@hebbelstrup2016], and who earn more [@vowles2020; @plutzer2020].
 
 One way to investigate this is to look at the estimated marginal means for each level of education, income, gender, and age as follows:
 
@@ -277,7 +277,7 @@ inf_emmeans("knowledge",
             df)
 ```
 
-We can see that the scale value increases in an (almost exclusively) monotonic fashion for education, income, and age, which is what we should expect if our scale measures knowledge. We also see that the mean level of knowledge is greater for men than for women. This all offers some evidence of construct validity. 
+We can see that the scale value increases in an (almost exclusively) monotonic fashion for education, income, and age, which is what we should expect if our scale measures political knowledge. We also see that the mean level of knowledge is greater for men than for women. This all offers some evidence of construct validity. 
 
 ## Calculating propensity scores
 
@@ -287,7 +287,7 @@ This is where the binary knowledge variable from before comes in. In our case, p
 
 To see why, return to the paradigm of a randomized experimental design, where the random allocation of participants to a treatment and a control group means that no feature of the participant is predictive of being found in the treatment as opposed to in the control. Whether female or male, rich or poor (and so on), you are equally likely to end up in one group as opposed to in the other. In the case of observational data, by contrast, this might not be the case. It might (for example) be that some features of the observations – such as, their level of education – are predictive of ending up in the ‘informed’ category.
 
-In fact, let's look at the data at hand, to determine whether the demographic factors that we have reason to believe influence someone's degree of knowledge -- again, gender, level of education, income, and age [@plutzer2020] -- are predictive of knowledge:
+In fact, let's look at the data at hand, to determine whether the demographic factors that we have reason to believe influence someone's degree of political knowledge -- again, gender, level of education, income, and age [@plutzer2020] -- are predictive of knowledge, as measured by our scale:
 
 ```{r predictive}
 df <- df %>% 
@@ -338,7 +338,7 @@ df %>%
   geom_histogram(binwidth=0.1, color = "black", fill = "salmon")
 ```
 
-What we want to see in this distribution is a clustering of propensity scores towards the low end, and not too many extreme scores. That said, extreme scores should not automatically be assumed to be incorrect [@levyetal2008], although one should be mindful that they of course have a disproportionate influence when subsequently using them as weights in our regression model (more on this below). When properly estimated, however, such weighting will counteract any correlations between demographics and levels of knowledge. Specifically, since propensity scores measure the probability of ending up in the ‘treatment’ category, given a set of covariates -- in our case, the probability that you would be ‘informed’, given your age, income, level of education and gender -- we can use the inverse of those scores as weights (such that an observation with a low propensity is weighted heavily) in fitting the model. Given an appropriately chosen set of covariates when calculating the scores, this recreates a situation that would have been expected in a randomized experiment, thereby allowing greater confidence in any counterfactual inference.
+What we want to see in this distribution is a clustering of propensity scores towards the low end, and not too many extreme scores. That said, extreme scores should not automatically be assumed to be incorrect [@levyetal2008], although one should be mindful that they of course have a disproportionate influence when subsequently using them as weights in our regression model (more on this below). When properly estimated, however, such weighting will counteract any correlations between demographics and levels of political knowledge. Specifically, since propensity scores measure the probability of ending up in the ‘treatment’ category, given a set of covariates -- in our case, the probability that you would be ‘informed’, given your age, income, level of education and gender -- we can use the inverse of those scores as weights (such that an observation with a low propensity is weighted heavily) in fitting the model. Given an appropriately chosen set of covariates when calculating the scores, this recreates a situation that would have been expected in a randomized experiment, thereby allowing greater confidence in any counterfactual inference.
 
 ## Evaluating propensity scores using balance plots
 
@@ -513,7 +513,7 @@ inf3 <- inf_effect(outcome = "immig_self",
                   boot_ci = T)
 ```
 
-Each model estimates actual and informed support for the idea that levels of immigration coming into the UK should be reduced, in order to estimate what difference level of knowledge makes on this issue. For both actual and informed support, we apply the survey weights included in the data set to approximate representativeness. We also plot the results with the dashed line representing 50% support.
+Each model estimates actual and informed support for the idea that levels of immigration coming into the UK should be reduced, in order to estimate what difference level of political knowledge makes on this issue. For both actual and informed support, we apply the survey weights included in the data set to approximate representativeness. We also plot the results with the dashed line representing 50% support.
 
 ```{r inf_effect_1}
 inf1
@@ -547,7 +547,7 @@ ggplot(plot_df) +
 
 ```
 
-The function returns the formula, the model, as well as the actual and estimated informed proportions (in each case weighted using the survey weights), as well as the difference between the two, i.e., the information effect. We see that, if people in the UK were all to become informed, in the respect operationalised here, the idea that immigration levels should be reduced would likely go from a majority to a minority position (with the dashed line signifying 50%), irrespective of the particular modeling assumptions made, suggesting some robustness of the results. The size of the effect -- close to 10 percentage points for the demographic model -- is noteworthy, especially in the context of the low bar set by the knowledge scale, suggesting that even a low level of knowledge makes a difference.
+The function returns the formula, the model, as well as the actual and estimated informed proportions (in each case weighted using the survey weights), as well as the difference between the two, i.e., the information effect. We see that, if people in the UK were all to become informed, in the respect operationalised here, the idea that immigration levels should be reduced would likely go from a majority to a minority position (with the dashed line signifying 50%), irrespective of the particular modeling assumptions made, suggesting some robustness of the results. The size of the effect -- close to 10 percentage points for the demographic model -- is noteworthy, especially in the context of the low bar set by the knowledge scale, suggesting that even a low level of political knowledge makes a difference.
 
 There is no established way to compute confidence intervals for the type of aggregate, counterfactual estimates reported here. For purposes of giving a sense of the variability of the individual estimates, bootstrapped confidence intervals are therefore returned, constructed as follows: 1,000 bootstrap samples are drawn from the (weighted) predictions, as well as from the weighted responses in the data set. Using R’s `boot` package [@davisonhinkley1997], basic 95% confidence intervals are then computed for the mean weighted prediction, the upper and lower bounds of which are then divided in each case by the mean weight in the total sample.
 
