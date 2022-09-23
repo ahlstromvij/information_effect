@@ -75,7 +75,7 @@ How does this work in practice? That's the question this guide is looking to ans
 
 The functions and their outputs will be illustrated by way of British Election Study data [@bes-17] containing the following attitudinal variable (`immigSelf`): "On a scale from 0-10, how would you prefer immigration levels to Britain changed?" (0 = reduced a lot, 5 = kept the same, 10 = increased a lot). For purposes of modeling, this variable has been re-coded as a binary one, with 1 for responses below 5, and 0 otherwise. This variable will be our outcome variable in what follows, alongside a set of demographic and socioeconomic covariates (education, income, gender, age, religion, ethnicity, partisanship, and EU referendum vote) and four knowledge variables, used in order to estimate what difference information would make to anti-immigration sentiments.
 
-# Modeling information effects using R
+# How to model information effects in R
 
 ## Constructing a knowledge scale using IRT
 
@@ -93,7 +93,7 @@ The function below uses R's `mirt` package [@chalmers2012] to generate an IRT sc
 library(mirt)
 library(psych)
 library(ggpubr)
-irt_scale <- function(items, data, binary_cutoff = 0.9) {
+inf_irt_scale <- function(items, data, binary_cutoff = 0.9) {
   # save all knowledge items to a data frame
   items_df <- data.frame(matrix(NA, nrow = dim(data)[1], ncol = length(items)))
   for (i in 1:length(items)) {
@@ -154,11 +154,11 @@ Let's start by fitting a model on our four knowledge items from the BES data set
 - "The number of MPs in Parliament is about 100" (False)
 
 ```{r irt_model, echo=TRUE, fig.show='hide', message=FALSE, results='hide'}
-irt_model <- irt_scale(c("k1",
-                         "k2",
-                         "k3",
-                         "k4"),
-                       df)
+irt_model <- inf_irt_scale(c("k1",
+                             "k2",
+                             "k3",
+                             "k4"),
+                           df)
 ```
 
 Then let's look at the parallel analysis plot (for unidimensionality), the Q3 values (for local independence), and the empirical plots (for model fit), in turn:
@@ -179,7 +179,7 @@ The largest Q3 value is -0.45. @yen1993 suggests a cut-off value of 0.2, but as 
 irt_model$empirical_plots
 ```
 
-The empirical plots for all items suggest an acceptable fit, with some possible reservations for item 1.
+The empirical plots for all items suggest an acceptable fit, with some possible reservations about item 1.
 
 Let's now look more closely at the IRT model itself:
 
@@ -311,7 +311,7 @@ Looking at the coefficient values for age, education, and income to begin with, 
 Let's now calculate the propensity scores, and visualise them as a histogram to get a sense of their distribution:
 
 ```{r prop_scores}
-prop_scores <- function(knowledge_var, covariates, data) {
+inf_prop_scores <- function(knowledge_var, covariates, data) {
   # construct formula
   f <- as.formula(
     paste(knowledge_var,
@@ -328,9 +328,9 @@ prop_scores <- function(knowledge_var, covariates, data) {
   return(ifelse(data[[knowledge_var]] == 1, 1/data$ps_value, 1/(1-data$ps_value)))
 }
 
-df$prop_score <- prop_scores(knowledge_var = "knowledge_binary", 
-                             covariates = c("age","gender","education","income"), 
-                             data = df)
+df$prop_score <- inf_prop_scores(knowledge_var = "knowledge_binary", 
+                                 covariates = c("age","gender","education","income"), 
+                                 data = df)
 
 df %>% 
   ggplot() +
@@ -347,7 +347,7 @@ Since the whole point of propensity scores is to balance the sample, we want to 
 ```{r balance_plots, message=FALSE}
 library(cobalt)
 library(gridExtra)
-balance_plots <- function(knowledge_var, covariates, prop_score, data) {
+inf_balance_plots <- function(knowledge_var, covariates, prop_score, data) {
   covs_general <- subset(data, select = covariates)
   plot_list <- vector('list', length(covariates))
   for (i in seq_along(covariates)) {
@@ -359,10 +359,10 @@ balance_plots <- function(knowledge_var, covariates, prop_score, data) {
   return(plot_list)
 }
 
-bal_plots <- balance_plots("knowledge_binary", 
-                           c("age", "gender", "income", "education"), 
-                           "prop_score", 
-                           df)
+bal_plots <- inf_balance_plots("knowledge_binary", 
+                               c("age", "gender", "income", "education"), 
+                               "prop_score", 
+                               df)
 ```
 
 We see there that, in each case, balance has been improved by the propensity scores (the right pane in each of the graphs). Had that not been the case, we might have wanted to revisit the cut-off for being 'informed' (currently, 90th percentile or above), in case the balance between the two groups is so lopsided that it's difficult to balance them using propensity scores.
@@ -381,7 +381,7 @@ Second, even if partisanship is not a mediator, controlling for it in this conte
 
 In the UK context, EU referendum vote is likely to in this respect be similar to partisanship, as far as causal modeling is concerned: research suggests that UK voters’ identification with “Leave” or “Remain” camps have become political identities in their own rights [@hobolt2021]. If correct, then referendum vote choice, too, is an unnecessary control because it is a function of socialization variables for which our model already controls.
 
-The DAG below summarises the assumptions made here for the purpose of modeling. Note the status of partisanship (“Party” in the graph) as a mediator for knowledge (“Know.”). If partisanship is an unnecessary control, the edge between knowledge and partisanship should be removed. Depending on the position one takes in relation to whether the EU referendum has become a political identity in its own right, EU referendum vote would either replace the partisanship node or (perhaps more plausibly) inhabit a structurally identical node (i.e., a mediator for knowledge) alongside it.
+The DAG below uses the R package `ggdag` [@ggdag] to summarise the assumptions made for the purpose of modeling. Note the status of partisanship (“Party” in the graph) as a mediator for knowledge (“Know.”). If partisanship is an unnecessary control, the edge between knowledge and partisanship should be removed. Depending on the position one takes in relation to whether the EU referendum has become a political identity in its own right, EU referendum vote would either replace the partisanship node or (perhaps more plausibly) inhabit a structurally identical node (i.e., a mediator for knowledge) alongside it.
 
 ```{r dag, message=FALSE, results='hide', warning=FALSE}
 library(ggdag)
