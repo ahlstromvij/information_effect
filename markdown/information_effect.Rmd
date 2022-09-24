@@ -551,24 +551,29 @@ plot_df <- tibble(
   upr = c(inf1$actual_upr, inf1$informed_upr, inf2$informed_upr, inf3$informed_upr)
 )
 
-theme_set(theme_grey())
+plot_df <- within(plot_df, scenario <- factor(scenario,
+                                                levels=c("Actual", "Informed (EU vote)", "Informed (partisanship)", "Informed (demographic)")))
+
+theme_set(theme_minimal())
+library(RColorBrewer)
 ggplot(plot_df) +
-  aes(x = reorder(scenario, -support),
+  aes(x = scenario,
       y = support,
       fill = scenario) +
   geom_bar(stat = "identity", color = "black") +
   geom_errorbar(aes(ymin=lwr,
                     ymax=upr), width=.1,
-                 position=position_dodge(.9)) +
+                position=position_dodge(.9)) +
   geom_hline(yintercept=0.5, linetype="dashed") +
+  scale_fill_brewer(palette="Blues") +
   ylab("Proportion of support") +
   xlab("Scenario") +
   ggtitle("Proportion wanting to see immigration levels reduced by scenario") +
   theme(legend.position = "none") +
-  annotate("text", x = 1, y = plot_df$support[1]+0.025, label = paste(round(plot_df$support[1] * 100, 1),"%", sep="")) +
-  annotate("text", x = 2, y = plot_df$support[4]+0.025, label = paste(round(plot_df$support[4] * 100, 1),"%", sep="")) +
-  annotate("text", x = 3, y = plot_df$support[3]+0.025, label = paste(round(plot_df$support[3] * 100, 1),"%", sep="")) +
-  annotate("text", x = 4, y = plot_df$support[2]+0.025, label = paste(round(plot_df$support[2] * 100, 1),"%", sep=""))
+  annotate("text", x = 1, y = plot_df$support[1]+0.025, label = paste(round(plot_df$support[1] * 100, 2),"%", sep="")) +
+  annotate("text", x = 2, y = plot_df$support[4]+0.025, label = paste(round(plot_df$support[4] * 100, 2),"%", sep="")) +
+  annotate("text", x = 3, y = plot_df$support[3]+0.025, label = paste(round(plot_df$support[3] * 100, 2),"%", sep="")) +
+  annotate("text", x = 4, y = plot_df$support[2]+0.025, label = paste(round(plot_df$support[2] * 100, 2),"%", sep=""))
 
 ```
 
